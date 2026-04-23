@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/4c936616-5f8d-4099-8ca9-f575fd22fb4f
+
 # VinZ
 
 **VinZ** (Yes, named after myself :DD) is a procedural terminal graphics engine. It draws mathematical fluid simulations and ASCII art directly into your terminal using 24-bit ANSI colors. It supports both half-block character resolution and dynamically generated ASCII matrices.
