@@ -8,6 +8,9 @@ https://github.com/user-attachments/assets/4c936616-5f8d-4099-8ca9-f575fd22fb4f
 
 It is written in C, fully interactive, and designed to provide a trippy visual experience in the command line.
 
+### New: The 3D Raymarching Engine
+VinZ now features a custom built 3D vector math and raymarching engine written completely from scratch. Without relying on any external graphics APIs (like OpenGL or Vulkan), VinZ mathematically simulates 3D space, calculates lighting, and renders dynamic geometry.
+
 ## Features
 
 - **Interactive UI:** Control palettes and visual styles in real-time.
