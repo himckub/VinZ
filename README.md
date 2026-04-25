@@ -11,10 +11,11 @@ It is written in C, fully interactive, and designed to provide a trippy visual e
 ## Features
 
 - **Interactive UI:** Control palettes and visual styles in real-time.
-- **10 Visual Styles:** 
+- **10 2D Visual Styles:** 
+- **8 3D Visual Styles (NEW):** Powered by a custom 3D vector math and raymarching engine.
 - **20 Color Palettes:** 
 - **True Color (24-bit RGB):** Renders incredibly smooth gradients and shadows.
-- **Double-Vertical Resolution:** 
+- **Double-Vertical Resolution:** Utilizes the half-block character to double vertical fidelity.
 - **Fast:** Written in C, using single buffer writes to avoid terminal flickering and achieve high FPS.
 
 ## Installation
@@ -50,6 +51,7 @@ vinz
 Once running, use your keyboard to change the visuals:
 - **W / S** (or Up/Down Arrows) : Change Visual Style (Pattern)
 - **A / D** (or Left/Right Arrows) : Change Color Palette
+- **T** : Toggle 3D Raymarching Engine (NEW)
 - **H** : Hide or Show the UI menu at the bottom
 - **Q** (or Ctrl+C) : Quit
 
