@@ -35,6 +35,14 @@ Just paste this into your terminal. It will download, compile, and install VinZ 
 curl -sL https://raw.githubusercontent.com/vinz-ux/VinZ/main/install.sh | bash
 ```
 
+### Arch Linux (AUR)
+
+```bash
+yay -S vinz-git
+# or
+paru -S vinz-git
+```
+
 ### Manual Install (From Source)
 
 ```bash
