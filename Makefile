@@ -1,7 +1,8 @@
 PREFIX ?= /usr/local
 CC ?= gcc
 CFLAGS ?= -O3 -Wall -Wextra
-LDFLAGS ?= -lm
+LDFLAGS ?=
+LDLIBS = -lm
 
 TARGET = vinz
 SRC = vinz.c
@@ -9,7 +10,7 @@ SRC = vinz.c
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 install: $(TARGET)
 	install -d $(DESTDIR)$(PREFIX)/bin
