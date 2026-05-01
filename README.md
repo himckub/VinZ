@@ -18,6 +18,7 @@ VinZ now features a custom built 3D vector math and raymarching engine written c
 ## Features
 
 - **Interactive UI:** Control palettes and visual styles in real-time.
+- **Procedural Randomizer:** Press `R` to generate an entirely unique, randomized mathematical shader on the fly. Share your favorite creations using the displayed seed.
 - **10 2D Visual Styles:** 
 - **8 3D Visual Styles (NEW):** Powered by a custom 3D vector math and raymarching engine.
 - **20 Color Palettes:** 
@@ -67,6 +68,7 @@ Once running, use your keyboard to change the visuals:
 - **W / S** (or Up/Down Arrows) : Change Visual Style (Pattern)
 - **A / D** (or Left/Right Arrows) : Change Color Palette
 - **T** : Toggle 3D Raymarching Engine (NEW)
+- **R** : Generate a new Procedural Shader on the fly
 - **H** : Hide or Show the UI menu at the bottom
 - **Q** (or Ctrl+C) : Quit
 
@@ -80,6 +82,7 @@ Options:
   -s, --speed <float>    Animation speed multiplier (default: 1.0)
   -p, --palette <int>    Starting color palette (0-19)
   -m, --style <int>      Starting style mode (0-9)
+  -r, --seed <int>       Load a specific procedural generation seed
   -h, --help             Show help message
 ```
 
@@ -88,6 +91,11 @@ Options:
 Start directly in the "Digital Rain" style with the "Matrix" palette:
 ```bash
 vinz -m 4 -p 1
+```
+
+Load a specific, randomly generated mathematical shader:
+```bash
+vinz -r 481023
 ```
 
 ## Requirements

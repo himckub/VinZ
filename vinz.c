@@ -10,8 +10,8 @@
 #include <termios.h>
 
 #define NUM_PALETTES 20
-#define NUM_STYLES_2D 10
-#define NUM_STYLES_3D 8
+#define NUM_STYLES_2D 11
+#define NUM_STYLES_3D 9
 
 volatile int running = 1;
 float speed_multiplier = 1.0f;
@@ -19,6 +19,41 @@ int palette = 0;
 int style = 0;
 int mode_3d = 0;
 int ui_visible = 1;
+
+unsigned int current_seed = 0;
+unsigned int rand_state = 0;
+
+unsigned int my_rand() {
+    rand_state = rand_state * 1664525 + 1013904223;
+    return rand_state;
+}
+
+float my_rand_f() {
+    return (float)(my_rand() & 0xFFFFFF) / (float)0xFFFFFF;
+}
+
+int r2d_type, r2d_iters; float r2d_f[8]; int r2d_op[4];
+int r3d_shape1, r3d_shape2, r3d_op, r3d_mod;
+float r3d_s1[3], r3d_s2[3], r3d_disp_f, r3d_disp_a;
+
+void generate_random_shader(unsigned int seed) {
+    current_seed = seed;
+    rand_state = seed;
+    
+    r2d_type = my_rand() % 4;
+    r2d_iters = 1 + my_rand() % 4;
+    for(int i=0; i<8; i++) r2d_f[i] = (my_rand_f() * 5.0f) - 2.5f;
+    for(int i=0; i<4; i++) r2d_op[i] = my_rand() % 4;
+
+    r3d_shape1 = my_rand() % 4;
+    r3d_shape2 = my_rand() % 4;
+    r3d_op = my_rand() % 4;
+    r3d_mod = my_rand() % 4;
+    for(int i=0; i<3; i++) r3d_s1[i] = (my_rand_f() * 2.0f) + 0.2f;
+    for(int i=0; i<3; i++) r3d_s2[i] = (my_rand_f() * 2.0f) + 0.2f;
+    r3d_disp_f = my_rand_f() * 5.0f;
+    r3d_disp_a = my_rand_f() * 0.5f;
+}
 
 struct termios orig_termios;
 
@@ -32,13 +67,13 @@ const char* palette_names[NUM_PALETTES] = {
 const char* style_names_2d[NUM_STYLES_2D] = {
     "Liquid Space", "ASCII Flow", "Plasma Waves", "Voronoi Cells",
     "Digital Rain", "Psychedelic", "Julia Fractal", "Hyperspace",
-    "Binary Code", "Black Hole"
+    "Binary Code", "Black Hole", "Procedural Gen"
 };
 
 const char* style_names_3d[NUM_STYLES_3D] = {
     "Spinning Hypercube", "Blocks Tunnel", "Cubescape",
     "Bouncing Cubes", "Liquid Cube", "Intersecting Rings",
-    "Sphere Grid", "Morphing Star"
+    "Sphere Grid", "Morphing Star", "Procedural Gen"
 };
 
 void print_help(const char* prog_name) {
@@ -114,6 +149,20 @@ float smin(float a, float b, float k) {
 
 float length2(float x, float y) { return sqrtf(x*x + y*y); }
 
+float eval_shape(vec3 p, int type, float s[3]) {
+    if (type == 0) {
+        return v3_len(p) - s[0] * 1.5f;
+    } else if (type == 1) {
+        vec3 d = {fabsf(p.x) - s[0], fabsf(p.y) - s[1], fabsf(p.z) - s[2]};
+        return fminf(fmaxf(d.x, fmaxf(d.y, d.z)), 0.0f) + v3_len((vec3){fmaxf(d.x,0.0f), fmaxf(d.y,0.0f), fmaxf(d.z,0.0f)});
+    } else if (type == 2) {
+        float qx = length2(p.x, p.z) - (s[0] * 1.5f);
+        return length2(qx, p.y) - (s[1] * 0.5f);
+    } else {
+        return length2(p.x, p.z) - s[0];
+    }
+}
+
 float map_3d(vec3 p, int style, float t) {
     if (style == 0) {
         p = rot_x(p, t * 0.4f);
@@ -177,12 +226,49 @@ float map_3d(vec3 p, int style, float t) {
                   p.y - floorf(p.y / 2.0f) * 2.0f - 1.0f, 
                   p.z - floorf(p.z / 2.0f) * 2.0f - 1.0f};
         return v3_len(q) - 0.4f;
-    } else {
+    } else if (style == 7) {
         p = rot_x(p, t * 0.3f);
         p = rot_y(p, t * 0.2f);
         float d = v3_len(p) - 2.0f;
         d += sinf(p.x*3.0f + t)*sinf(p.y*3.0f + t)*sinf(p.z*3.0f + t) * 0.4f;
         return d * 0.8f;
+    } else {
+        p = rot_x(p, t * 0.3f);
+        p = rot_y(p, t * 0.2f);
+        
+        vec3 p1 = p;
+        vec3 p2 = p;
+        
+        if (r3d_mod == 1) { 
+            float s = sinf(r3d_s1[0] * p.y);
+            float c = cosf(r3d_s1[0] * p.y);
+            p1.x = p.x * c - p.z * s;
+            p1.z = p.x * s + p.z * c;
+        } else if (r3d_mod == 2) { 
+            p1.x = fabsf(p1.x) - r3d_s1[1]*1.5f;
+            p1.z = fabsf(p1.z) - r3d_s1[1]*1.5f;
+        } else if (r3d_mod == 3) {
+            p1 = rot_z(p1, t * 0.5f); 
+            p2 = rot_x(p2, -t * 0.4f); 
+        }
+        
+        float s1_mod[3] = {r3d_s1[0] + 0.8f, r3d_s1[1] + 0.8f, r3d_s1[2] + 0.8f};
+        float s2_mod[3] = {r3d_s2[0] + 0.8f, r3d_s2[1] + 0.8f, r3d_s2[2] + 0.8f};
+        
+        float d1 = eval_shape(p1, r3d_shape1, s1_mod);
+        float d2 = eval_shape(p2, r3d_shape2, s2_mod);
+        
+        float disp = sinf(p.x * r3d_disp_f + t) * sinf(p.y * r3d_disp_f - t) * sinf(p.z * r3d_disp_f) * (r3d_disp_a * 0.5f);
+        d1 += disp;
+        
+        float res;
+        if (r3d_op == 0) res = fminf(d1, d2);
+        else if (r3d_op == 1) res = smin(d1, d2, 0.8f);
+        else if (r3d_op == 2) res = fmaxf(d1, -d2);
+        else res = fmaxf(d1, d2);
+        
+        float bounds = v3_len(p) - 3.5f; 
+        return fmaxf(res * 0.8f, bounds);
     }
 }
 
@@ -313,9 +399,56 @@ void get_pattern(int current_style, float u, float v, float t, float* out_x, flo
             *out_y = sinf(swirl) * radius * 10.0f;
             break;
         }
+        case 10: {
+            float cx = u * 5.0f * r2d_f[4], cy = v * 5.0f * r2d_f[5];
+            
+            if (r2d_type == 0) {
+                for (int i = 0; i < r2d_iters; i++) {
+                    float nx = cx, ny = cy;
+                    if (r2d_op[0] == 0) nx += sinf(cy * r2d_f[0] + t * r2d_f[1]);
+                    else if (r2d_op[0] == 1) nx += cosf(cy * r2d_f[0] - t * r2d_f[1]);
+                    else nx += sinf(cx * r2d_f[0] + t * r2d_f[1]) * cosf(cy * r2d_f[0]);
+
+                    if (r2d_op[1] == 0) ny += cosf(cx * r2d_f[2] + t * r2d_f[3]);
+                    else if (r2d_op[1] == 1) ny += sinf(cx * r2d_f[2] - t * r2d_f[3]);
+                    else ny += cosf(cy * r2d_f[2] + t * r2d_f[3]) * sinf(cx * r2d_f[2]);
+
+                    cx = nx; cy = ny;
+                }
+            } else if (r2d_type == 1) {
+                for (int i = 0; i < r2d_iters * 2; i++) {
+                    cx = fabsf(cx) - r2d_f[0];
+                    cy = fabsf(cy) - r2d_f[1];
+                    float angle = t * r2d_f[2];
+                    float s = sinf(angle), c = cosf(angle);
+                    float nx = cx * c - cy * s;
+                    float ny = cx * s + cy * c;
+                    cx = nx * r2d_f[3]; cy = ny * r2d_f[3];
+                }
+            } else if (r2d_type == 2) {
+                float sum = 0.0f;
+                for (int i = 1; i <= r2d_iters + 1; i++) {
+                    float fi = (float)i;
+                    sum += sinf(cx * r2d_f[0] * fi + t * r2d_f[1]) * cosf(cy * r2d_f[2] * fi - t * r2d_f[3]);
+                    cx += r2d_f[6]; cy += r2d_f[7];
+                }
+                cx = sum; cy = sum * r2d_f[4];
+            } else {
+                float dist = sqrtf(cx*cx + cy*cy);
+                float angle = atan2f(cy, cx);
+                for (int i = 0; i < r2d_iters; i++) {
+                    angle += sinf(dist * r2d_f[0] - t * r2d_f[1]) * r2d_f[2];
+                    dist += cosf(angle * r2d_f[3] + t * r2d_f[4]) * r2d_f[5];
+                }
+                cx = cosf(angle) * dist;
+                cy = sinf(angle) * dist;
+            }
+            
+            *out_x = cx; *out_y = cy;
+            break;
+        }
     }
 }
-
 void render_pixel(int current_style, float u, float v, float t, int* r_out, int* g_out, int* b_out, char* char_out) {
     t *= speed_multiplier;
     float x = 0, y = 0;
@@ -411,20 +544,36 @@ int main(int argc, char* argv[]) {
         {"speed",   required_argument, 0, 's'},
         {"palette", required_argument, 0, 'p'},
         {"style",   required_argument, 0, 'm'},
+        {"seed",    required_argument, 0, 'r'},
         {"help",    no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
 
     int opt;
     int option_index = 0;
-    while ((opt = getopt_long(argc, argv, "s:p:m:h", long_options, &option_index)) != -1) {
+    int start_seed = -1;
+    
+    while ((opt = getopt_long(argc, argv, "s:p:m:r:h", long_options, &option_index)) != -1) {
         switch (opt) {
             case 's': speed_multiplier = atof(optarg); break;
             case 'p': palette = atoi(optarg) % NUM_PALETTES; break;
-            case 'm': style = atoi(optarg) % NUM_STYLES_2D; break;
+            case 'm': 
+                style = atoi(optarg); 
+                if (style >= NUM_STYLES_2D) {
+                    mode_3d = 1;
+                    style = style - NUM_STYLES_2D;
+                    if (style >= NUM_STYLES_3D) style = NUM_STYLES_3D - 1;
+                }
+                break;
+            case 'r': start_seed = atoi(optarg); break;
             case 'h': print_help(argv[0]); return 0;
             default: print_help(argv[0]); return 1;
         }
+    }
+
+    if (start_seed != -1) {
+        generate_random_shader(start_seed);
+        style = NUM_STYLES_2D - 1; // Default to 2D random
     }
 
     signal(SIGINT, handle_sigint);
@@ -467,6 +616,12 @@ int main(int argc, char* argv[]) {
                 mode_3d = !mode_3d;
                 current_num_styles = mode_3d ? NUM_STYLES_3D : NUM_STYLES_2D;
                 if (style >= current_num_styles) style = current_num_styles - 1;
+            } else if (c == 'r' || c == 'R') {
+                struct timeval rtv;
+                gettimeofday(&rtv, NULL);
+                unsigned int seed = rtv.tv_sec ^ rtv.tv_usec;
+                generate_random_shader(seed);
+                style = mode_3d ? (NUM_STYLES_3D - 1) : (NUM_STYLES_2D - 1);
             } else if (c == '\033') {
                 usleep(5000);
                 char seq[2];
@@ -547,21 +702,28 @@ int main(int argc, char* argv[]) {
             
             buf_pos += snprintf(frame_buffer + buf_pos, buf_size - buf_pos, "\033[%d;1H\033[48;5;236m\033[38;5;255m", rows);
             
+            char style_display[128];
+            if ((!mode_3d && style == NUM_STYLES_2D - 1) || (mode_3d && style == NUM_STYLES_3D - 1)) {
+                snprintf(style_display, sizeof(style_display), "%s [Seed: %u]", current_style_name, current_seed);
+            } else {
+                snprintf(style_display, sizeof(style_display), "%s", current_style_name);
+            }
+            
             if (mode_3d) {
                 buf_pos += snprintf(frame_buffer + buf_pos, buf_size - buf_pos, 
-                    " [VinZ] \033[38;5;213;1m[T] 3D (NEW): ON \033[0m\033[48;5;236m\033[38;5;255m | Style: %02d/%02d - \033[38;5;208;1m%s\033[0m\033[48;5;236m\033[38;5;255m | Palette: %02d/%02d - \033[38;5;45;1m%s\033[0m\033[48;5;236m\033[38;5;255m | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
-                    style + 1, current_num_styles, current_style_name,
+                    " [VinZ] \033[38;5;213;1m[T] 3D (NEW): ON \033[0m\033[48;5;236m\033[38;5;255m | Style: %02d/%02d - \033[38;5;208;1m%s\033[0m\033[48;5;236m\033[38;5;255m | Palette: %02d/%02d - \033[38;5;45;1m%s\033[0m\033[48;5;236m\033[38;5;255m | [R]andom | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
+                    style + 1, current_num_styles, style_display,
                     palette + 1, NUM_PALETTES, palette_names[palette]);
             } else {
                 buf_pos += snprintf(frame_buffer + buf_pos, buf_size - buf_pos, 
-                    " [VinZ] \033[38;5;213;1m[T] 3D (NEW): OFF\033[0m\033[48;5;236m\033[38;5;255m | Style: %02d/%02d - \033[38;5;208;1m%s\033[0m\033[48;5;236m\033[38;5;255m | Palette: %02d/%02d - \033[38;5;45;1m%s\033[0m\033[48;5;236m\033[38;5;255m | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
-                    style + 1, current_num_styles, current_style_name,
+                    " [VinZ] \033[38;5;213;1m[T] 3D (NEW): OFF\033[0m\033[48;5;236m\033[38;5;255m | Style: %02d/%02d - \033[38;5;208;1m%s\033[0m\033[48;5;236m\033[38;5;255m | Palette: %02d/%02d - \033[38;5;45;1m%s\033[0m\033[48;5;236m\033[38;5;255m | [R]andom | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
+                    style + 1, current_num_styles, style_display,
                     palette + 1, NUM_PALETTES, palette_names[palette]);
             }
             
             // Calculate strictly visible characters for padding
-            int visible_len = snprintf(NULL, 0, " [VinZ] [T] 3D (NEW): %s | Style: %02d/%02d - %s | Palette: %02d/%02d - %s | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
-                mode_3d ? "ON " : "OFF", style + 1, current_num_styles, current_style_name, palette + 1, NUM_PALETTES, palette_names[palette]);
+            int visible_len = snprintf(NULL, 0, " [VinZ] [T] 3D (NEW): %s | Style: %02d/%02d - %s | Palette: %02d/%02d - %s | [R]andom | W/S: Style | A/D: Color | [H]ide | [Q]uit ", 
+                mode_3d ? "ON " : "OFF", style + 1, current_num_styles, style_display, palette + 1, NUM_PALETTES, palette_names[palette]);
 
             for (int i = visible_len; i < cols; i++) {
                 buf_pos += snprintf(frame_buffer + buf_pos, buf_size - buf_pos, " ");
